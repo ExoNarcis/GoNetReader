@@ -25,3 +25,5 @@ func Sender(Connection net.Conn) {
 }
 
 ```  
+### Scheme:
+![](sheme.jpg)
