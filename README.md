@@ -7,8 +7,11 @@
 func ConnectionRouter(Connection net.Conn) {
   reader := GoNetReader.NewNetReader()
   for {
-    Pack, ErrRead := reader.NetRead(Connection)
-      if ErrRead != nil {
+    Pack, err := reader.NetRead(Connection)
+      if err != nil {
+		if err == io.EOF {
+          Connection.Close() // EOF
+        }
         continue 
       }
     //  ...
