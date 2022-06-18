@@ -3,7 +3,6 @@ package GoNetReader
 import (
 	"bufio"
 	"bytes"
-	"errors"
 	"net"
 	"strconv"
 )
@@ -12,6 +11,7 @@ type NetReader struct {
 	BufScaner     *bufio.Scanner // Scanner
 	NetBufChannel chan string    // Channel
 	_bufRes       []byte         // Buff
+	_netError     error
 }
 
 func (reader *NetReader) splitShoter() ([]string, error) { // splitter
@@ -26,8 +26,8 @@ func (reader *NetReader) splitShoter() ([]string, error) { // splitter
 								rString := string(reader._bufRes[j+11 : j+11+s]) // getstr pack
 								if len(reader._bufRes) > j+24+s {                // if > 1 pack in buff
 									reader._bufRes = reader._bufRes[j+23+s:] // free 1 pack
-									shot, errsp := reader.splitShoter()      // rec call
-									if errsp != nil {
+									shot, err := reader.splitShoter()        // rec call
+									if err != nil {
 										return []string{rString}, nil // error in rec
 									} else {
 										return append([]string{rString}, shot...), nil //push arrays and return
@@ -43,16 +43,17 @@ func (reader *NetReader) splitShoter() ([]string, error) { // splitter
 		}
 	}
 	reader._bufRes = reader._bufRes[:0] // clear buff
-	return nil, errors.New("Split Error")
+	return nil, bufio.ErrFinalToken
 }
 
 func (reader *NetReader) queueManager() { // manager buff
 	if len(reader._bufRes) == 0 {
 		return
 	}
-	strigSlise, errSpl := reader.splitShoter() // get packages in buff
-	if errSpl != nil {
+	strigSlise, err := reader.splitShoter() // get packages in buff
+	if err != nil {
 		reader._bufRes = reader._bufRes[:0] // clear buff
+		reader._netError = err
 		return
 	} else {
 		for i := 0; i < len(strigSlise); i++ {
@@ -94,21 +95,24 @@ func (reader *NetReader) scan() { // scanner
 	reader.NetBufChannel <- reader.BufScaner.Text()
 }
 
-func (reader *NetReader) ReadPackage() (string, error) {
-	reader.BufScaner.Split(reader.FindPack) // set scanner func
-	go reader.scan()                        // start scanner
+func (reader *NetReader) ReadWithoutEmpty(Wchannel chan string) (string, error) {
 	if err := reader.BufScaner.Err(); err != nil {
 		return "", err
 	}
-	return reader.ReadWithoutEmpty(reader.NetBufChannel), nil
-}
-
-func (reader *NetReader) ReadWithoutEmpty(Wchannel chan string) string {
+	if reader._netError != nil {
+		return "", reader._netError
+	}
 	Pack := <-Wchannel
 	if Pack != "" && Pack != " " && len(Pack) > 0 { // check empty
-		return Pack
+		return Pack, nil
 	}
 	return reader.ReadWithoutEmpty(Wchannel)
+}
+
+func (reader *NetReader) ReadPackage() (string, error) {
+	reader.BufScaner.Split(reader.FindPack) // set scanner func
+	go reader.scan()                        // start scanner
+	return reader.ReadWithoutEmpty(reader.NetBufChannel)
 }
 
 func (reader *NetReader) NetRead(Connection net.Conn) (string, error) { // general read function
@@ -121,7 +125,7 @@ func (reader *NetReader) NetRead(Connection net.Conn) (string, error) { // gener
 
 func NewNetReader() *NetReader { // return reader
 	nefr := NetReader{}
-	go nefr.queueManager()
+	//go nefr.queueManager()
 	return &nefr
 }
 
