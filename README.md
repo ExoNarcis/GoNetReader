@@ -9,7 +9,7 @@ func ConnectionRouter(Connection net.Conn) {
   for {
     Pack, err := reader.NetRead(Connection)
       if err != nil {
-		if err == io.EOF {
+	if err == io.EOF {
           Connection.Close() // EOF
         }
         continue 
