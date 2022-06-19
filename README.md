@@ -23,7 +23,7 @@ func ConnectionRouter(Connection net.Conn) {
 ``` 
 func Sender(Connection net.Conn) { 
   // ...
-  _, connecterr := Connection.Write(GetPackage(pack))
+  _, connecterr := Connection.Write(GoNetReader.GetPackage(pack))
   // ...
 }
 
